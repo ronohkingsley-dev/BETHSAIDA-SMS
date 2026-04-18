@@ -3,7 +3,7 @@ import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { supabase, Profile } from './lib/supabase';
 import { useTheme } from './lib/ThemeContext';
 import { Button } from './components/ui/button';
-import { GraduationCap, Users, BookOpen, DollarSign, LogOut, ArrowUpRight, UserCog, Settings as SettingsIcon, Sun, Moon } from 'lucide-react';
+import { GraduationCap, Users, BookOpen, DollarSign, LogOut, ArrowUpRight, UserCog, Settings as SettingsIcon, Sun, Moon, UserMinus } from 'lucide-react';
 import { Toaster } from './components/ui/sonner';
 
 export default function Layout() {
@@ -131,6 +131,7 @@ export default function Layout() {
     { name: 'Dashboard', path: '/', icon: GraduationCap },
     { name: 'Learners', path: '/learners', icon: Users },
     { name: 'Finance', path: '/finance', icon: DollarSign },
+    { name: 'Departures', path: '/departures', icon: UserMinus },
     { name: 'Academics', path: '/academics', icon: BookOpen },
     { name: 'Boarders', path: '/boarders', icon: UserCog },
     { name: 'Promotion Hub', path: '/promotion', icon: ArrowUpRight },

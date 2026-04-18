@@ -165,6 +165,23 @@ export default function Finance() {
       }));
       toast.success('Payment recorded successfully');
 
+      // Check if departed learner has cleared fees
+      if (learner.current_grade.startsWith('DEPARTED-') && data.balance <= 0) {
+        setTimeout(async () => {
+          if (window.confirm(`${learner.name} has cleared all outstanding fees. Would you like to permanently remove them from the system now?`)) {
+            try {
+              await supabase.from('finance_records').delete().eq('learner_id', learner.id);
+              await supabase.from('academic_records').delete().eq('learner_id', learner.id);
+              await supabase.from('learners').delete().eq('id', learner.id);
+              toast.success(`${learner.name} removed from system.`);
+              fetchData();
+            } catch (err) {
+              toast.error('Failed to remove learner after fee clearance');
+            }
+          }
+        }, 500);
+      }
+
       if (printReceipt) {
         generateReceipt(learner, data, numAmount, paymentType, refNumber);
       }
@@ -373,11 +390,11 @@ export default function Finance() {
         </div>
         <div className="flex gap-2 ml-auto">
           <Dialog open={isRecordModalOpen} onOpenChange={setIsRecordModalOpen}>
-            <DialogTrigger asChild>
-              <Button className="h-12 px-6 rounded-xl font-bold shadow-lg shadow-green-500/20 bg-green-600 hover:bg-green-700">
-                <Plus className="w-4 h-4 mr-2" />
-                Record Payment
-              </Button>
+            <DialogTrigger render={
+              <Button className="h-12 px-6 rounded-xl font-bold shadow-lg shadow-green-500/20 bg-green-600 hover:bg-green-700" />
+            }>
+              <Plus className="w-4 h-4 mr-2" />
+              Record Payment
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] rounded-3xl">
               <DialogHeader>

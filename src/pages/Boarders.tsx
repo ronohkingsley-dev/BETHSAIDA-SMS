@@ -3,7 +3,7 @@ import { useOutletContext, Navigate, useNavigate } from 'react-router-dom';
 import { supabase, Learner, FinanceRecord, Profile } from '../lib/supabase';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
-import { CreditCard } from 'lucide-react';
+import { CreditCard, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Boarders() {
@@ -33,11 +33,12 @@ export default function Boarders() {
   const fetchBoarders = async () => {
     setLoading(true);
     
-    // Fetch learners who are boarders
+    // Fetch learners who are boarders and not departed
     const { data: learnersData, error: learnersError } = await supabase
       .from('learners')
       .select('*')
       .eq('boarding_status', 'boarding')
+      .not('current_grade', 'ilike', 'DEPARTED-%')
       .order('name');
       
     if (learnersError) {
@@ -66,6 +67,58 @@ export default function Boarders() {
     }
     
     setLoading(false);
+  };
+
+  const handleDelete = async (learner: Learner) => {
+    if (!profile || profile.role !== 'admin') {
+      toast.error('Only administrators can delete learners');
+      return;
+    }
+
+    const { id, name, current_grade } = learner;
+    const record = records[id];
+    const balance = record ? record.balance : 0;
+
+    if (balance > 0) {
+      if (window.confirm(`${name} has an outstanding balance of KES ${balance.toLocaleString()}. Transfer to the Departures list instead of permanent deletion?`)) {
+        setLoading(true);
+        try {
+          const { error } = await supabase
+            .from('learners')
+            .update({ current_grade: `DEPARTED-${current_grade}` })
+            .eq('id', id);
+          
+          if (error) throw error;
+          toast.success(`${name} moved to Departures`);
+          fetchBoarders();
+        } catch (error: any) {
+          toast.error(error.message || 'Failed to transfer learner');
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+    } else {
+      if (!window.confirm(`Are you sure you want to permanently remove ${name}? This will remove all related financial and academic records.`)) {
+        return;
+      }
+
+      setLoading(true);
+      try {
+        await supabase.from('finance_records').delete().eq('learner_id', id);
+        await supabase.from('academic_records').delete().eq('learner_id', id);
+        
+        const { error } = await supabase.from('learners').delete().eq('id', id);
+        if (error) throw error;
+        
+        toast.success(`${name} removed permanently from the system`);
+        fetchBoarders();
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to delete learner');
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
   return (
@@ -133,15 +186,25 @@ export default function Boarders() {
                       )}
                     </TableCell>
                     <TableCell className="text-center px-6">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-8 px-3 rounded-lg text-primary hover:bg-primary/10 font-bold"
-                        onClick={() => navigate(`/finance?learnerId=${learner.id}`)}
-                      >
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        Fee
-                      </Button>
+                      <div className="flex justify-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 px-3 rounded-lg text-primary hover:bg-primary/10 font-bold"
+                          onClick={() => navigate(`/finance?learnerId=${learner.id}`)}
+                        >
+                          <CreditCard className="w-4 h-4 mr-2" />
+                          Fee
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                          onClick={() => handleDelete(learner)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

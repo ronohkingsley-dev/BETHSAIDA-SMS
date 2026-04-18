@@ -15,6 +15,7 @@ import PromotionHub from './pages/PromotionHub';
 import Settings from './pages/Settings';
 import Teachers from './pages/Teachers';
 import Boarders from './pages/Boarders';
+import Departures from './pages/Departures';
 
 const router = createBrowserRouter([
   {
@@ -56,6 +57,10 @@ const router = createBrowserRouter([
       {
         path: 'boarders',
         element: <Boarders />,
+      },
+      {
+        path: 'departures',
+        element: <Departures />,
       },
     ],
   },

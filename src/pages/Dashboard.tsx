@@ -20,7 +20,8 @@ export default function Dashboard() {
       if (profile?.role === 'admin') {
         const { count } = await supabase
           .from('learners')
-          .select('*', { count: 'exact', head: true });
+          .select('*', { count: 'exact', head: true })
+          .not('current_grade', 'ilike', 'DEPARTED-%');
         
         setTotalLearners(count);
 

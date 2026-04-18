@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { CreditCard, Search } from 'lucide-react';
+import { CreditCard, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Learners() {
@@ -59,8 +59,60 @@ export default function Learners() {
     setIsDialogOpen(true);
   };
 
+  const handleDelete = async (learner: Learner) => {
+    if (!profile || profile.role !== 'admin') {
+      toast.error('Only administrators can delete learners');
+      return;
+    }
+
+    const { id, name, current_grade } = learner;
+    const record = records[id];
+    const balance = record ? record.balance : 0;
+
+    if (balance > 0) {
+      if (window.confirm(`${name} has an outstanding balance of KES ${balance.toLocaleString()}. Transfer to the Departures list instead of permanent deletion?`)) {
+        setLoading(true);
+        try {
+          const { error } = await supabase
+            .from('learners')
+            .update({ current_grade: `DEPARTED-${current_grade}` })
+            .eq('id', id);
+          
+          if (error) throw error;
+          toast.success(`${name} moved to Departures`);
+          fetchLearners();
+        } catch (error: any) {
+          toast.error(error.message || 'Failed to transfer learner');
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+    } else {
+      if (!window.confirm(`Are you sure you want to permanently remove ${name}? This will remove all related financial and academic records.`)) {
+        return;
+      }
+
+      setLoading(true);
+      try {
+        await supabase.from('finance_records').delete().eq('learner_id', id);
+        await supabase.from('academic_records').delete().eq('learner_id', id);
+        
+        const { error } = await supabase.from('learners').delete().eq('id', id);
+        if (error) throw error;
+        
+        toast.success(`${name} removed permanently from the system`);
+        fetchLearners();
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to delete learner');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const fetchLearners = async () => {
-    let query = supabase.from('learners').select('*').order('name');
+    let query = supabase.from('learners').select('*').not('current_grade', 'ilike', 'DEPARTED-%').order('name');
     
     if (profile?.role === 'teacher' && profile?.assigned_grade) {
       query = query.eq('current_grade', profile.assigned_grade);
@@ -238,8 +290,8 @@ export default function Learners() {
           </div>
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={openAddDialog} className="h-12 px-6 rounded-xl font-bold shadow-lg shadow-primary/20">Add New Learner</Button>
+            <DialogTrigger render={<Button onClick={openAddDialog} className="h-12 px-6 rounded-xl font-bold shadow-lg shadow-primary/20" />}>
+              Add New Learner
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] rounded-3xl">
               <DialogHeader>
@@ -442,6 +494,16 @@ export default function Learners() {
                           <CreditCard className="w-4 h-4 mr-1.5" />
                           Fee
                         </Button>
+                        {profile?.role === 'admin' && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                            onClick={() => handleDelete(learner)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

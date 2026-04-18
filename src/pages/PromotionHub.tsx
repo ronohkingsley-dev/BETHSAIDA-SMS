@@ -37,7 +37,7 @@ export default function PromotionHub() {
   // Fetch learners for preview
   useState(() => {
     const fetchPreview = async () => {
-      const { data } = await supabase.from('learners').select('*').order('name');
+      const { data } = await supabase.from('learners').select('*').not('current_grade', 'ilike', 'DEPARTED-%').order('name');
       setPreviewLearners(data || []);
     };
     fetchPreview();
@@ -61,7 +61,8 @@ export default function PromotionHub() {
       // 1. Fetch all learners
       const { data: learners, error: learnersError } = await supabase
         .from('learners')
-        .select('*');
+        .select('*')
+        .not('current_grade', 'ilike', 'DEPARTED-%');
       
       if (learnersError) throw learnersError;
       if (!learners || learners.length === 0) {
