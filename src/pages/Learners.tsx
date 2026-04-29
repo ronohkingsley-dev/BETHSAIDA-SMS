@@ -15,11 +15,12 @@ export default function Learners() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const initialGrade = searchParams.get('grade') || '';
+  const initialSearch = searchParams.get('search') || '';
   
   const [learners, setLearners] = useState<Learner[]>([]);
   const [records, setRecords] = useState<Record<string, FinanceRecord>>({});
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingLearner, setEditingLearner] = useState<Learner | null>(null);
@@ -32,6 +33,15 @@ export default function Learners() {
   const [parentName, setParentName] = useState('');
   const [parentContact, setParentContact] = useState('');
   const [boardingStatus, setBoardingStatus] = useState<'day' | 'boarding'>('day');
+  const [gender, setGender] = useState<'boy' | 'girl'>('boy');
+
+  // Sync search state with URL parameter if it changes
+  useEffect(() => {
+    const searchParam = searchParams.get('search');
+    if (searchParam !== null) {
+      setSearch(searchParam);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     fetchLearners();
@@ -45,6 +55,7 @@ export default function Learners() {
     setParentName('');
     setParentContact('');
     setBoardingStatus('day');
+    setGender('boy');
     setIsDialogOpen(true);
   };
 
@@ -56,6 +67,7 @@ export default function Learners() {
     setParentName(learner.parent_name || '');
     setParentContact(learner.parent_contact || '');
     setBoardingStatus(learner.boarding_status);
+    setGender(learner.gender || 'boy');
     setIsDialogOpen(true);
   };
 
@@ -66,11 +78,30 @@ export default function Learners() {
     }
 
     const { id, name, current_grade } = learner;
+    
+    // Auto-cleanup for system ghost records accidentally added as "learners"
+    if (learner.assessment_no === 'SYSTEM-ANNOUNCEMENT' || learner.current_grade === 'SYSTEM-ANNOUNCEMENT') {
+      try {
+        await supabase.from('learners').delete().eq('id', id);
+        toast.success('System record removed');
+        fetchLearners();
+      } catch (err) {
+        console.error(err);
+      }
+      return;
+    }
+
     const record = records[id];
     const balance = record ? record.balance : 0;
+    const hasOutstandingFees = balance > 0;
 
-    if (balance > 0) {
-      if (window.confirm(`${name} has an outstanding balance of KES ${balance.toLocaleString()}. Transfer to the Departures list instead of permanent deletion?`)) {
+    if (hasOutstandingFees) {
+      // Logic: If they owe money, they MUST go to Departures instead of permanent deletion
+      const confirmMove = window.confirm(
+        `${name} has an outstanding balance of KES ${balance.toLocaleString()}.\n\nStudents with pending fees cannot be permanently deleted. Would you like to move them to the 'Departures' list instead?`
+      );
+
+      if (confirmMove) {
         setLoading(true);
         try {
           const { error } = await supabase
@@ -79,40 +110,40 @@ export default function Learners() {
             .eq('id', id);
           
           if (error) throw error;
-          toast.success(`${name} moved to Departures`);
+          toast.success(`${name} moved to Departures due to pending fees`);
           fetchLearners();
         } catch (error: any) {
           toast.error(error.message || 'Failed to transfer learner');
         } finally {
           setLoading(false);
         }
-        return;
       }
     } else {
-      if (!window.confirm(`Are you sure you want to permanently remove ${name}? This will remove all related financial and academic records.`)) {
-        return;
-      }
+      // Logic: If balance is zero, they can be permanently removed
+      const confirmDelete = window.confirm(
+        `Are you sure you want to permanently delete ${name}?\n\nThis student has cleared all fees. This action cannot be undone.`
+      );
 
-      setLoading(true);
-      try {
-        await supabase.from('finance_records').delete().eq('learner_id', id);
-        await supabase.from('academic_records').delete().eq('learner_id', id);
-        
-        const { error } = await supabase.from('learners').delete().eq('id', id);
-        if (error) throw error;
-        
-        toast.success(`${name} removed permanently from the system`);
-        fetchLearners();
-      } catch (error: any) {
-        toast.error(error.message || 'Failed to delete learner');
-      } finally {
-        setLoading(false);
+      if (confirmDelete) {
+        setLoading(true);
+        try {
+          // The database handles cascade delete if you ran the latest SQL script
+          const { error } = await supabase.from('learners').delete().eq('id', id);
+          if (error) throw error;
+          
+          toast.success(`${name} permanently removed from system`);
+          fetchLearners();
+        } catch (error: any) {
+          toast.error(error.message || 'Failed to delete learner');
+        } finally {
+          setLoading(false);
+        }
       }
     }
   };
 
   const fetchLearners = async () => {
-    let query = supabase.from('learners').select('*').not('current_grade', 'ilike', 'DEPARTED-%').order('name');
+    let query = supabase.from('learners').select('*').not('current_grade', 'ilike', 'DEPARTED-%').not('current_grade', 'eq', 'SYSTEM-ANNOUNCEMENT').order('name');
     
     if (profile?.role === 'teacher' && profile?.assigned_grade) {
       query = query.eq('current_grade', profile.assigned_grade);
@@ -200,6 +231,7 @@ export default function Learners() {
           name: name.trim(),
           assessment_no: assessmentNo.trim(),
           current_grade: currentGrade,
+          gender: gender,
           parent_name: parentName.trim(),
           parent_contact: parentContact.trim(),
           boarding_status: boardingStatus
@@ -214,6 +246,7 @@ export default function Learners() {
             name: name.trim(),
             assessment_no: assessmentNo.trim(),
             current_grade: currentGrade,
+            gender: gender,
             parent_name: parentName.trim(),
             parent_contact: parentContact.trim(),
             boarding_status: boardingStatus
@@ -290,8 +323,10 @@ export default function Learners() {
           </div>
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger render={<Button onClick={openAddDialog} className="h-12 px-6 rounded-xl font-bold shadow-lg shadow-primary/20" />}>
-              Add New Learner
+            <DialogTrigger asChild>
+              <Button onClick={openAddDialog} className="h-12 px-6 rounded-xl font-bold shadow-lg shadow-primary/20">
+                Add New Learner
+              </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] rounded-3xl">
               <DialogHeader>
@@ -371,6 +406,19 @@ export default function Learners() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground ml-1">Gender</Label>
+                <Select value={gender} onValueChange={(v: 'boy'|'girl') => setGender(v)} required>
+                  <SelectTrigger className="h-11 rounded-xl bg-secondary/30 border-none font-bold text-foreground">
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="boy">Boy</SelectItem>
+                    <SelectItem value="girl">Girl</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground ml-1">Parent Name (Optional)</Label>
@@ -419,7 +467,7 @@ export default function Learners() {
         </div>
       </div>
 
-      <div className="border border-border/50 rounded-3xl bg-card overflow-hidden shadow-sm">
+      <div className="hidden md:block border border-border/50 rounded-3xl bg-card overflow-hidden shadow-sm">
         <Table>
           <TableHeader className="bg-secondary/30">
             <TableRow className="hover:bg-transparent border-border/50">
@@ -498,8 +546,12 @@ export default function Learners() {
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            className="h-8 w-8 p-0 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-                            onClick={() => handleDelete(learner)}
+                            className="h-8 w-8 p-0 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-100 transition-all active:scale-95 duration-200 pointer-events-auto"
+                            title="Delete Learner"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(learner);
+                            }}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -512,6 +564,97 @@ export default function Learners() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4">
+        {loading ? (
+          <div className="text-center py-12 text-muted-foreground bg-card rounded-3xl border border-border/50">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+            Loading learners...
+          </div>
+        ) : filteredLearners.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground bg-card rounded-3xl border border-border/50">
+            No learners found
+          </div>
+        ) : (
+          filteredLearners.map((learner) => {
+            const record = records[learner.id];
+            const balance = record ? record.balance : null;
+            return (
+              <div key={learner.id} className="bg-card rounded-2xl border border-border/50 p-4 shadow-sm space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-bold text-foreground text-lg">{learner.name}</h3>
+                    <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold">{learner.assessment_no}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className="px-2 py-0.5 bg-primary/5 text-primary text-[10px] font-bold rounded-lg border border-primary/10">
+                      {learner.current_grade}
+                    </span>
+                    <span className={`text-[10px] font-bold uppercase ${learner.boarding_status === 'boarding' ? 'text-purple-600' : 'text-blue-600'}`}>
+                      {learner.boarding_status}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-y border-border/50">
+                  <div className="text-xs">
+                    <span className="text-muted-foreground">Fee Status:</span>
+                    <div className="mt-1">
+                      {balance !== null ? (
+                        balance <= 0 ? (
+                          <span className="text-green-600 text-[10px] font-bold bg-green-50 dark:bg-green-900/20 px-2.5 py-1 rounded-full border border-green-200 dark:border-green-800 uppercase">Paid</span>
+                        ) : (
+                          <span className="text-red-600 text-[10px] font-bold bg-red-50 dark:bg-red-900/20 px-2.5 py-1 rounded-full border border-red-200 dark:border-red-800 uppercase text-xs">Bal: {balance.toLocaleString()}</span>
+                        )
+                      ) : (
+                        <span className="text-neutral-400 text-[10px] font-bold uppercase tracking-wider">No Record</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-xs text-right">
+                    <span className="text-muted-foreground block mb-1">Parent:</span>
+                    <span className="font-medium text-foreground">{learner.parent_name || '-'}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1 h-10 rounded-xl font-bold"
+                    onClick={() => openEditDialog(learner)}
+                  >
+                    Edit
+                  </Button>
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    className="flex-1 h-10 rounded-xl font-bold"
+                    onClick={() => navigate(`/finance?learnerId=${learner.id}`)}
+                  >
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Fees
+                  </Button>
+                  {profile?.role === 'admin' && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-10 w-10 rounded-xl text-red-500 bg-red-50 dark:bg-red-900/20 active:scale-95 transition-transform"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(learner);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

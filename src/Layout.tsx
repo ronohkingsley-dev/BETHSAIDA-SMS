@@ -3,7 +3,7 @@ import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import { supabase, Profile } from './lib/supabase';
 import { useTheme } from './lib/ThemeContext';
 import { Button } from './components/ui/button';
-import { GraduationCap, Users, BookOpen, DollarSign, LogOut, ArrowUpRight, UserCog, Settings as SettingsIcon, Sun, Moon, UserMinus } from 'lucide-react';
+import { GraduationCap, Users, BookOpen, DollarSign, LogOut, ArrowUpRight, UserCog, Settings as SettingsIcon, Sun, Moon, UserMinus, Menu, X, Download } from 'lucide-react';
 import { Toaster } from './components/ui/sonner';
 
 export default function Layout() {
@@ -11,8 +11,29 @@ export default function Layout() {
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -60,6 +81,11 @@ export default function Layout() {
       subscription.unsubscribe();
     };
   }, [navigate, location.pathname]);
+
+  // Close menu on route change
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [location.pathname]);
 
   const fetchProfile = async (userId: string) => {
     setLoadingProfile(true);
@@ -148,16 +174,31 @@ export default function Layout() {
   const navItems = profile?.role === 'admin' ? adminNavItems : teacherNavItems;
 
   return (
-    <div className="min-h-screen bg-background flex text-foreground">
+    <div className="min-h-screen bg-background flex text-foreground overflow-hidden">
+      {/* Mobile Sidebar Overlay */}
+      {isMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm transition-opacity duration-300"
+          onClick={() => setIsMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-72 bg-sidebar border-r border-sidebar-border flex flex-col sticky top-0 h-screen">
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-72 bg-sidebar border-r border-sidebar-border flex flex-col 
+        transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0
+        ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
         <div className="p-8 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
             <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
               <GraduationCap className="w-6 h-6 text-primary-foreground" />
             </div>
-            <span className="tracking-tight">EduManage</span>
+            <span className="tracking-tight">Bethsaida</span>
           </h1>
+          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsMenuOpen(false)}>
+            <X className="w-6 h-6 text-sidebar-foreground" />
+          </Button>
         </div>
         
         <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto">
@@ -182,9 +223,19 @@ export default function Layout() {
         </nav>
 
         <div className="p-6 mt-auto">
-          <div className="bg-sidebar-accent/50 rounded-2xl p-4 mb-4 border border-sidebar-border/50">
+          {deferredPrompt && (
+            <Button 
+              onClick={handleInstall}
+              className="w-full mb-4 rounded-xl gap-2 bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-500/20"
+            >
+              <Download className="w-4 h-4" />
+              Install App
+            </Button>
+          )}
+
+          <div className="bg-sidebar-accent/50 rounded-2xl p-4 border border-sidebar-border/50">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shadow-inner">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shadow-inner shrink-0">
                 {profile?.full_name?.charAt(0) || 'U'}
               </div>
               <div className="flex-1 min-w-0">
@@ -209,22 +260,28 @@ export default function Layout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 min-w-0">
-        <header className="h-24 border-b border-border/50 glass sticky top-0 z-30 px-10 flex items-center justify-between">
+      <main className="flex-1 min-w-0 flex flex-col h-screen">
+        <header className="h-16 lg:h-24 border-b border-border/50 glass sticky top-0 z-30 px-4 lg:px-10 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-4">
-            <h2 className="text-2xl font-bold text-foreground capitalize tracking-tight">
+            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsMenuOpen(true)}>
+              <Menu className="w-6 h-6" />
+            </Button>
+            <h2 className="text-lg lg:text-2xl font-bold text-foreground capitalize tracking-tight truncate">
               {location.pathname === '/' ? 'Overview' : location.pathname.substring(1).replace('-', ' ')}
             </h2>
           </div>
           <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-secondary/50 rounded-full text-[10px] font-bold text-muted-foreground uppercase tracking-widest border border-border/50 shadow-inner">
+            <div className="hidden sm:flex items-center gap-3 px-4 py-2 bg-secondary/50 rounded-full text-[10px] font-bold text-muted-foreground uppercase tracking-widest border border-border/50 shadow-inner">
               <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)] animate-pulse" />
-              System Online
+              Online
             </div>
           </div>
         </header>
-        <div className="p-10 max-w-7xl mx-auto">
-          <Outlet context={{ profile }} />
+
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-10">
+          <div className="max-w-7xl mx-auto pb-10">
+            <Outlet context={{ profile }} />
+          </div>
         </div>
       </main>
       <Toaster />

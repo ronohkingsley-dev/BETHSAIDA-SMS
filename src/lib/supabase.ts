@@ -41,6 +41,7 @@ export type Learner = {
   name: string;
   assessment_no: string;
   current_grade: string;
+  gender: 'boy' | 'girl';
   parent_name?: string;
   parent_contact?: string;
   boarding_status: 'day' | 'boarding';

@@ -242,7 +242,7 @@ export default function Academics() {
         </div>
       </div>
 
-      <div className="border border-border/50 rounded-3xl bg-card overflow-hidden shadow-sm overflow-x-auto">
+      <div className="hidden md:block border border-border/50 rounded-3xl bg-card overflow-hidden shadow-sm overflow-x-auto">
         <Table>
           <TableHeader className="bg-secondary/30">
             <TableRow className="hover:bg-transparent border-border/50">
@@ -296,6 +296,56 @@ export default function Academics() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Mobile Academic Cards */}
+      <div className="md:hidden space-y-6">
+        {loading ? (
+          <div className="text-center py-12 text-muted-foreground bg-card rounded-3xl border border-border/50">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+            Loading...
+          </div>
+        ) : learners.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground bg-card rounded-3xl border border-border/50">
+            No learners found
+          </div>
+        ) : (
+          learners.map((learner) => (
+            <div key={learner.id} className="bg-card rounded-2xl border border-border/50 p-6 shadow-sm space-y-4">
+              <div className="flex justify-between items-center border-b border-border/50 pb-4">
+                <div>
+                  <h3 className="font-bold text-foreground text-lg">{learner.name}</h3>
+                  <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">{learner.assessment_no}</p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="rounded-xl font-bold gap-2 text-primary border-primary/20 bg-primary/5"
+                  onClick={() => generateReport(learner)}
+                >
+                  <FileText className="w-4 h-4" />
+                  PDF
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {subjects.map(sub => (
+                  <div key={sub} className="flex justify-between items-center p-3 bg-secondary/20 rounded-xl border border-border/30">
+                    <span className="text-xs font-medium text-muted-foreground truncate max-w-[150px]">{sub}</span>
+                    <Input 
+                      type="number" 
+                      min="1" 
+                      max="4"
+                      className="w-12 h-9 text-center font-bold rounded-lg bg-background border-border/50"
+                      value={scores[learner.id]?.[sub] || ''}
+                      onChange={(e) => handleScoreChange(learner.id, sub, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

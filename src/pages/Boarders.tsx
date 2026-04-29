@@ -128,7 +128,7 @@ export default function Boarders() {
         <p className="text-muted-foreground font-medium mt-1">Manage boarding students and their fee status</p>
       </div>
 
-      <div className="border border-border/50 rounded-3xl bg-card overflow-hidden shadow-sm">
+      <div className="hidden md:block border border-border/50 rounded-3xl bg-card overflow-hidden shadow-sm">
         <Table>
           <TableHeader className="bg-secondary/30">
             <TableRow className="hover:bg-transparent border-border/50">
@@ -212,6 +212,78 @@ export default function Boarders() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Mobile Boarder Cards */}
+      <div className="md:hidden space-y-4">
+        {loading ? (
+          <div className="text-center py-12 text-muted-foreground bg-card rounded-3xl border border-border/50">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+            Loading boarders...
+          </div>
+        ) : boarders.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground bg-card rounded-3xl border border-border/50">
+            No boarders found
+          </div>
+        ) : (
+          boarders.map((learner) => {
+            const record = records[learner.id];
+            const balance = record ? record.balance : 0;
+            return (
+              <div key={learner.id} className="bg-card rounded-2xl border border-border/50 p-4 shadow-sm space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-bold text-foreground text-lg">{learner.name}</h3>
+                    <p className="text-xs text-muted-foreground font-bold uppercase">{learner.assessment_no}</p>
+                  </div>
+                  <span className="px-2 py-0.5 bg-primary/5 text-primary text-[10px] font-bold rounded-lg border border-primary/10">
+                    {learner.current_grade}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 py-2 border-y border-border/50">
+                  <div className="text-xs">
+                    <p className="text-muted-foreground mb-1">Parent:</p>
+                    <p className="font-medium truncate">{learner.parent_name || '-'}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{learner.parent_contact || '-'}</p>
+                  </div>
+                  <div className="text-xs text-right">
+                    <p className="text-muted-foreground mb-1">Fee Status:</p>
+                    {record ? (
+                      balance <= 0 ? (
+                        <span className="text-green-600 font-bold uppercase text-[10px]">Paid</span>
+                      ) : (
+                        <span className="text-red-600 font-bold text-xs">Bal: {balance.toLocaleString()}</span>
+                      )
+                    ) : (
+                      <span className="text-neutral-400 italic">No Record</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    className="flex-1 h-10 rounded-xl font-bold"
+                    onClick={() => navigate(`/finance?learnerId=${learner.id}`)}
+                  >
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Fees
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-10 w-10 rounded-xl text-red-500 bg-red-50 dark:bg-red-900/20"
+                    onClick={() => handleDelete(learner)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

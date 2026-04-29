@@ -316,15 +316,15 @@ export default function Finance() {
           <div 
             onClick={() => setShowRevenue(!showRevenue)}
             className={`
-              cursor-pointer transition-all duration-500 px-6 py-3 rounded-2xl border shadow-sm group
+              cursor-pointer transition-all duration-500 px-6 py-3 rounded-2xl border shadow-sm group w-full md:w-auto
               ${showRevenue 
                 ? 'bg-primary/10 border-primary/20 ring-4 ring-primary/5' 
-                : 'bg-secondary/10 border-border/30 opacity-30 hover:opacity-100 hover:bg-secondary/30'}
+                : 'bg-secondary/5 border-border/10 opacity-40 hover:opacity-100 hover:bg-secondary/10'}
             `}
           >
-            <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground mb-1 group-hover:text-foreground transition-colors">Total Revenue Collected</p>
-            <p className={`text-xl font-bold transition-all duration-500 ${showRevenue ? 'text-primary scale-105' : 'text-muted-foreground/20 blur-[2px]'}`}>
-              {showRevenue ? `KES ${totalRevenue?.toLocaleString() || '0'}` : '••••••••'}
+            <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground mb-1 group-hover:text-foreground transition-colors">Total School Revenue Collected</p>
+            <p className={`text-xl font-bold transition-all duration-500 ${showRevenue ? 'text-primary scale-105' : 'text-muted-foreground/10 blur-[4px] select-none'}`}>
+              {showRevenue ? `KES ${totalRevenue?.toLocaleString() || '0'}` : 'KES 00,000,000'}
             </p>
           </div>
           <div className="flex gap-3">
@@ -540,7 +540,7 @@ export default function Finance() {
         </div>
       </div>
 
-      <div className="border border-border/50 rounded-3xl bg-card overflow-hidden shadow-sm">
+      <div className="hidden md:block border border-border/50 rounded-3xl bg-card overflow-hidden shadow-sm">
         <Table>
           <TableHeader className="bg-secondary/30">
             <TableRow className="hover:bg-transparent border-border/50">
@@ -587,7 +587,7 @@ export default function Finance() {
                         variant="ghost" 
                         size="sm" 
                         className="h-8 w-8 p-0 rounded-lg text-primary hover:bg-primary/10"
-                        onClick={() => generateReceipt(learner, record)} 
+                        onClick={() => generateReceipt(learner, record)}
                         disabled={!record}
                       >
                         <FileText className="w-4 h-4" />
@@ -599,6 +599,59 @@ export default function Finance() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Mobile Finance Cards */}
+      <div className="md:hidden space-y-4">
+        {loading ? (
+          <div className="text-center py-12 text-muted-foreground bg-card rounded-3xl border border-border/50">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+            Loading...
+          </div>
+        ) : learners.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground bg-card rounded-3xl border border-border/50">
+            No records found
+          </div>
+        ) : (
+          learners.map((learner) => {
+            const record = records[learner.id];
+            return (
+              <div key={learner.id} className="bg-card rounded-2xl border border-border/50 p-4 shadow-sm space-y-3">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold text-foreground">{learner.name}</h3>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-9 w-9 rounded-xl text-primary bg-primary/5"
+                    onClick={() => generateReceipt(learner, record)}
+                    disabled={!record}
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div className="p-3 bg-secondary/30 rounded-xl border border-border/30">
+                    <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground mb-1">Tuition</p>
+                    <p className="text-sm font-bold">{showTotals ? `KES ${record?.tuition_fee?.toLocaleString() || 0}` : '***'}</p>
+                  </div>
+                  <div className="p-3 bg-secondary/30 rounded-xl border border-border/30">
+                    <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground mb-1">Arrears</p>
+                    <p className="text-sm font-bold text-red-600">{showTotals ? `KES ${record?.arrears_carried_forward?.toLocaleString() || 0}` : '***'}</p>
+                  </div>
+                  <div className="p-3 bg-secondary/30 rounded-xl border border-border/30">
+                    <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground mb-1">Paid</p>
+                    <p className="text-sm font-bold text-green-600">{showTotals ? `KES ${record?.total_paid?.toLocaleString() || 0}` : '***'}</p>
+                  </div>
+                  <div className="p-3 bg-primary/5 rounded-xl border border-primary/20">
+                    <p className="text-[9px] uppercase tracking-widest font-bold text-primary mb-1">Balance</p>
+                    <p className="text-sm font-bold text-primary">{showTotals ? `KES ${record?.balance?.toLocaleString() || 0}` : '***'}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
